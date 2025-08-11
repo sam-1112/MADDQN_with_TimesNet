@@ -123,17 +123,17 @@ class MADDQN:
             QValues_List = np.zeros((num_agents, max_timesteps, 3), dtype=np.float32)
             
             # 時間步循環 - 使用嵌套進度條
-            timestep_pbar = tqdm(
-                range(max_timesteps),
-                desc=f"Ep{episode:02d} Steps",
-                unit="step",
-                leave=False,  # 不保留時間步進度條
-                ncols=140,
-                bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{rate_fmt}] {postfix}'
-            )
+            # timestep_pbar = tqdm(
+            #     range(max_timesteps),
+            #     desc=f"Ep{episode:02d} Steps",
+            #     unit="step",
+            #     leave=False,  # 不保留時間步進度條
+            #     ncols=140,
+            #     bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{rate_fmt}] {postfix}'
+            # )
 
             # 時間步循環 - for i=1 to T do
-            for timestep in timestep_pbar:
+            for timestep in range(max_timesteps):
                 if timestep >= total_sequences:
                     break
                     
@@ -244,18 +244,18 @@ class MADDQN:
                     self._update_target_networks(timestep + 1)
 
                 # 更新時間步進度條的後綴信息
-                avg_reward = np.mean(agent_rewards) if agent_rewards else 0
-                timestep_pbar.set_postfix({
-                    'Risk_R': f'{episode_risk_return:.1f}',
-                    'Return_R': f'{episode_return_return:.1f}',
-                    'Final_R': f'{episode_final_return:.1f}',
-                    'Risk_ε': f'{self.riskAgentModel.epsilon:.3f}',
-                    'Return_ε': f'{self.returnAgentModel.epsilon:.3f}',
-                    'Final_ε': f'{self.finalAgentModel.epsilon:.3f}'
-                })
+                # avg_reward = np.mean(agent_rewards) if agent_rewards else 0
+                # timestep_pbar.set_postfix({
+                #     'Risk_R': f'{episode_risk_return:.1f}',
+                #     'Return_R': f'{episode_return_return:.1f}',
+                #     'Final_R': f'{episode_final_return:.1f}',
+                #     'Risk_ε': f'{self.riskAgentModel.epsilon:.3f}',
+                #     'Return_ε': f'{self.returnAgentModel.epsilon:.3f}',
+                #     'Final_ε': f'{self.finalAgentModel.epsilon:.3f}'
+                # })
 
             # 關閉時間步進度條
-            timestep_pbar.close()
+            # timestep_pbar.close()
 
             # Episode結束後的處理
             # Epsilon衰減
