@@ -6,6 +6,7 @@ env:
   return_agent: 1
   trade_amount: 1000
   initial_balance: 1000000000.0
+  reward_optimization: False
 
 agent:
   learning_rate: 0.001
@@ -15,7 +16,7 @@ agent:
   gamma: 0.9
 
 training:
-  episodes: 10
+  episodes: 100
   batch_size: 64
   replay_memory_size: 1000
   sample_size: 64
@@ -32,10 +33,12 @@ training:
   risk_agent_model_path: "./checkpoints/risk_agent.pth"
   return_agent_model_path: "./checkpoints/return_agent.pth"
   final_agent_model_path: "./checkpoints/final_agent.pth"
+  attention: False
+  multi_stocks: False
   
 
 data:
-  ticker: "dji"
+  ticker: "^DJI"
   train_start_date: "2007-01-01"
   train_end_date: "2020-12-31"
   test_start_date: "2021-01-01"

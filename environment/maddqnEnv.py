@@ -67,7 +67,7 @@ class MADDQNENV:
             raise Exception("Environment is done. Please reset the environment.")
         info = {}
         # Update the current step
-        print(f"Action taken: {action}, Current step: {self.current_step}")
+        # print(f"Action taken: {action}, Current step: {self.current_step}")
 
         # 更新持倉狀態（這是獎勵函數中使用的POS_t）
         self.observation.position_state = action  # 直接將動作作為持倉狀態
@@ -133,69 +133,76 @@ class MADDQNENV:
         # print(f"  Current price: {current_price:.6f}")
         # print(f"  Position state (POS_t): {position_state}")
         
-        if agentType == 'final':
-            # Final Agent: POS_t × (p_{t+1} - p_t) / p_t × 100
-            if step + 1 < len(prices):
-                next_price = prices[step + 1]
-                price_return = (next_price - current_price) / current_price
-                reward = position_state * price_return * 100
-                
-                # print(f"  Next price: {next_price:.6f}")
-                # print(f"  Price return: {price_return:.6f}")
-                # print(f"  Raw reward: {reward:.6f}")
-                
-                # 由於position_state只有{-1,0,1}，獎勵範圍自然受限
-                # 但仍然可以加上安全限制
-                # reward = np.clip(reward, -10.0, 10.0)
-                # print(f"  Final reward: {reward:.6f}")
-            else:
-                print("Warning: Not enough future prices to calculate final reward.")
-                reward = 0.0
-                
-        elif agentType == 'risk':
-            # Risk Agent: POS_t × mean(R_t^n) / std(R_t^n)
-            n = self.window_size  # 未來10天的收益率
-            
-            return_rates = []
-            for i in range(1, n + 1):
-                if step + i < len(prices):
-                    future_price = prices[step + i - 1]
-                    return_rate = (future_price - current_price) / current_price
-                    return_rates.append(return_rate)
-            
-            if len(return_rates) > 1:
-                return_rates = np.array(return_rates)
-                mean_return = np.mean(return_rates)
-                std_return = np.std(return_rates)
-                
-                if std_return > 1e-8:
-                    sharpe_ratio = mean_return / std_return
-                    reward = position_state * sharpe_ratio
-                else:
-                    reward = position_state * mean_return
+        reward_optimization = self.configs['env']['reward_optimization']
+        if reward_optimization == False:
+            if agentType == 'final':
+                # Final Agent: POS_t × (p_{t+1} - p_t) / p_t × 100
+                if step + 1 < len(prices):
+                    next_price = prices[step + 1]
+                    price_return = (next_price - current_price) / current_price
+                    reward = position_state * price_return * 100
                     
-                # 限制獎勵範圍
-                # reward = np.clip(reward, -5.0, 5.0)
-            else:
-                print("Warning: Not enough return rates to calculate risk reward.")
-                reward = 0.0
+                    # print(f"  Next price: {next_price:.6f}")
+                    # print(f"  Price return: {price_return:.6f}")
+                    # print(f"  Raw reward: {reward:.6f}")
+                    
+                    # 由於position_state只有{-1,0,1}，獎勵範圍自然受限
+                    # 但仍然可以加上安全限制
+                    # reward = np.clip(reward, -10.0, 10.0)
+                    # print(f"  Final reward: {reward:.6f}")
+                else:
+                    print("Warning: Not enough future prices to calculate final reward.")
+                    reward = 0.0
+                    
+            elif agentType == 'risk':
+                # Risk Agent: POS_t × mean(R_t^n) / std(R_t^n)
+                n = self.window_size  # 未來10天的收益率
                 
-        elif agentType == 'return':
-            # Return Agent: POS_t × (p_{t+n} - p_t) / p_t × 100
-            n = self.window_size
+                return_rates = []
+                for i in range(1, n + 1):
+                    if step + i < len(prices):
+                        future_price = prices[step + i - 1]
+                        return_rate = (future_price - current_price) / current_price
+                        return_rates.append(return_rate)
+                
+                if len(return_rates) > 1:
+                    return_rates = np.array(return_rates)
+                    mean_return = np.mean(return_rates)
+                    std_return = np.std(return_rates)
+                    
+                    if std_return > 1e-8:
+                        sharpe_ratio = mean_return / std_return
+                        reward = position_state * sharpe_ratio
+                    else:
+                        reward = position_state * mean_return
+                        
+                    # 限制獎勵範圍
+                    # reward = np.clip(reward, -5.0, 5.0)
+                else:
+                    print("Warning: Not enough return rates to calculate risk reward.")
+                    reward = 0.0
+                    
+            elif agentType == 'return':
+                # Return Agent: POS_t × (p_{t+n} - p_t) / p_t × 100
+                n = self.window_size
+                
+                if step + n < len(prices):
+                    future_price = prices[step + n - 1]
+                    price_return = (future_price - current_price) / current_price
+                    reward = position_state * price_return * 100
+                    
+                    # 限制獎勵範圍
+                    # reward = np.clip(reward, -15.0, 15.0)
+                else:
+                    print("Warning: Not enough future prices to calculate return reward.")
+                    reward = 0.0
+                    
+            else:
+                raise ValueError("Invalid agentType. Choose from 'final', 'risk', or 'return'.")
             
-            if step + n < len(prices):
-                future_price = prices[step + n - 1]
-                price_return = (future_price - current_price) / current_price
-                reward = position_state * price_return * 100
-                
-                # 限制獎勵範圍
-                # reward = np.clip(reward, -15.0, 15.0)
-            else:
-                print("Warning: Not enough future prices to calculate return reward.")
-                reward = 0.0
-                
-        else:
-            raise ValueError("Invalid agentType. Choose from 'final', 'risk', or 'return'.")
+            return reward
         
-        return reward
+        else:
+            # Use Bayesian optimization for reward calculation
+            
+            pass

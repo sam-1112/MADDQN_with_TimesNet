@@ -55,7 +55,7 @@ class subAgent(BaseAgent):
         
         # 動作映射：模型輸出 [0, 1, 2] -> 環境期望 [-1, 0, 1]
         action_mapping = [-1, 0, 1]  # 索引0->-1(short), 索引1->0(hold), 索引2->1(long)
-        print(f"Epsilon value: {self.epsilon}")
+        # print(f"Epsilon value: {self.epsilon}")
         if training:
             if random.random() < self.epsilon:
                 # 隨機選擇動作索引，然後映射為環境動作

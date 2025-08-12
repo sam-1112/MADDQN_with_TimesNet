@@ -29,6 +29,13 @@ class MADDQN:
             'final_agent': {'rewards': []}
         }
         
+        # 添加 episode 層級的回報追蹤
+        self.episode_returns = {
+            'risk_agent': [],
+            'return_agent': [],
+            'final_agent': []
+        }
+        
         self.subEnvList = []
 
         self.test_dates = {
@@ -59,6 +66,32 @@ class MADDQN:
         self.data_processor = PreprocessData(data=self.unprocessed_data, window_size=self.configs['env']['window_size'], dates=dates)
         self.train_data, self.test_data = self.data_processor.timeSeriesData()
         
+        window_size = self.configs['env']['window_size']
+    
+        # 計算實際可用的數據索引範圍
+        total_sequences = len(self.train_data) + len(self.test_data)
+        available_data_start_idx = window_size - 1  # 第一個可用序列對應的原始數據索引
+        available_data_end_idx = available_data_start_idx + total_sequences - 1
+        
+        # 實際的訓練集日期範圍
+        self.actual_train_start_date = self.unprocessed_data.index[available_data_start_idx]
+        train_end_idx = available_data_start_idx + len(self.train_data) - 1
+        self.actual_train_end_date = self.unprocessed_data.index[train_end_idx]
+        
+        # 實際的測試集日期範圍  
+        test_start_idx = train_end_idx + 1
+        self.actual_test_start_date = self.unprocessed_data.index[test_start_idx]
+        self.actual_test_end_date = self.unprocessed_data.index[available_data_end_idx]
+        
+        # 打印實際日期範圍與配置比較
+        print(f"\n📅 日期範圍比較:")
+        print(f"配置的訓練期間: {self.configs['data']['train_start_date']} ~ {self.configs['data']['train_end_date']}")
+        print(f"實際的訓練期間: {self.actual_train_start_date.date()} ~ {self.actual_train_end_date.date()}")
+        print(f"配置的測試期間: {self.configs['data']['test_start_date']} ~ {self.configs['data']['test_end_date']}")
+        print(f"實際的測試期間: {self.actual_test_start_date.date()} ~ {self.actual_test_end_date.date()}")
+        print(f"窗口大小影響: 前 {window_size-1} 天的數據用於構建窗口，無法作為獨立樣本")
+    
+        
         # Initialize all subagents' environments - 修正參數
         self.subEnvList = []
         for agentType in ['risk', 'return']:
@@ -87,19 +120,9 @@ class MADDQN:
         # 獲取訓練數據總長度
         total_sequences = len(self.train_data)
         print(f"Total training sequences: {total_sequences}")
-        
-        # 主訓練循環 - 使用 tqdm 進度條
-        episode_pbar = tqdm(
-            range(1, self.configs['training']['episodes'] + 1), 
-            desc="Training Episodes", 
-            unit="episode",
-            ncols=150,
-            leave=True,
-            bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}'
-        )
 
         # 主訓練循環 - for episode = 1 to M do
-        for episode in episode_pbar:
+        for episode in range(1, self.configs['training']['episodes'] + 1):
             print(f"\n=== Episode {episode}/{self.configs['training']['episodes']} ===")
             
             # 重置環境 - Initialize sequence s1 = {x1} and preprocessed state φ1 = φ(s1)
@@ -123,21 +146,21 @@ class MADDQN:
             QValues_List = np.zeros((num_agents, max_timesteps, 3), dtype=np.float32)
             
             # 時間步循環 - 使用嵌套進度條
-            # timestep_pbar = tqdm(
-            #     range(max_timesteps),
-            #     desc=f"Ep{episode:02d} Steps",
-            #     unit="step",
-            #     leave=False,  # 不保留時間步進度條
-            #     ncols=140,
-            #     bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{rate_fmt}] {postfix}'
-            # )
+            timestep_pbar = tqdm(
+                range(max_timesteps),
+                desc=f"Ep{episode:02d} Steps",
+                unit="step",
+                leave=False,  # 不保留時間步進度條
+                ncols=140,
+                bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]'
+            )
 
             # 時間步循環 - for i=1 to T do
-            for timestep in range(max_timesteps):
+            for timestep in timestep_pbar:
                 if timestep >= total_sequences:
                     break
                     
-                print(f"  Timestep {timestep + 1}/{max_timesteps}")
+                # print(f"  Timestep {timestep + 1}/{max_timesteps}")
                 
                 # 獲取當前序列 si = {xi} and preprocessed state φi = φ(si)
                 current_sequence = self.train_data[timestep]
@@ -244,18 +267,15 @@ class MADDQN:
                     self._update_target_networks(timestep + 1)
 
                 # 更新時間步進度條的後綴信息
-                # avg_reward = np.mean(agent_rewards) if agent_rewards else 0
-                # timestep_pbar.set_postfix({
-                #     'Risk_R': f'{episode_risk_return:.1f}',
-                #     'Return_R': f'{episode_return_return:.1f}',
-                #     'Final_R': f'{episode_final_return:.1f}',
-                #     'Risk_ε': f'{self.riskAgentModel.epsilon:.3f}',
-                #     'Return_ε': f'{self.returnAgentModel.epsilon:.3f}',
-                #     'Final_ε': f'{self.finalAgentModel.epsilon:.3f}'
-                # })
+                avg_reward = np.mean(agent_rewards) if agent_rewards else 0
+                timestep_pbar.set_postfix({
+                    'Risk_R': f'{episode_risk_return:.1f}',
+                    'Return_R': f'{episode_return_return:.1f}',
+                    'Final_R': f'{episode_final_return:.1f}'
+                })
 
             # 關閉時間步進度條
-            # timestep_pbar.close()
+            timestep_pbar.close()
 
             # Episode結束後的處理
             # Epsilon衰減
@@ -267,15 +287,6 @@ class MADDQN:
             self._record_episode_results(episode, episode_risk_return, episode_return_return, 
                                         episode_final_return, current_episode_losses)
 
-            # 更新主進度條的後綴信息
-            episode_pbar.set_postfix({
-                'Risk_Return': f'{episode_risk_return:.2f}',
-                'Return_Return': f'{episode_return_return:.2f}',
-                'Final_Return': f'{episode_final_return:.2f}',
-                'Risk_ε': f'{self.riskAgentModel.epsilon:.3f}',
-                'Return_ε': f'{self.returnAgentModel.epsilon:.3f}',
-                'Final_ε': f'{self.finalAgentModel.epsilon:.3f}'
-            })
             
             # 每10個episode打印進度
             if episode % 10 == 0:
@@ -283,8 +294,6 @@ class MADDQN:
                 # 分析獎勵分佈
                 self.analyze_reward_distribution()
                 
-        # 關閉主進度條
-        episode_pbar.close()
         
         # 訓練完成
         print("\nMADDQN 訓練過程完成！")
@@ -500,13 +509,17 @@ class MADDQN:
         self.returnAgentModel.target_network.load_state_dict(self.returnAgentModel.policy_network.state_dict())
         self.riskAgentModel.target_network.load_state_dict(self.riskAgentModel.policy_network.state_dict())
         self.finalAgentModel.target_network.load_state_dict(self.finalAgentModel.policy_network.state_dict())
-        print(f"  Target networks updated at Timestep {timestep + 1}")
+        # print(f"  Target networks updated at Timestep {timestep + 1}")
     
 
     def _record_episode_results(self, episode, risk_return, return_return, final_return, losses):
         """
         記錄每個episode的每個代理的回報率和損失值
         """
+        # 記錄 episode 層級的回報 - 這是修正的重點
+        self.episode_returns['risk_agent'].append(risk_return)
+        self.episode_returns['return_agent'].append(return_return)
+        self.episode_returns['final_agent'].append(final_return)
         print(f"Episode {episode} Results:")
         print(f"  Risk Agent Return: {risk_return:.2f}, Losses: {np.mean(losses['risk_agent']):.4f}")
         print(f"  Return Agent Return: {return_return:.2f}, Losses: {np.mean(losses['return_agent']):.4f}")
@@ -540,7 +553,6 @@ class MADDQN:
         """
         繪製每個代理的獎勵分佈圖
         """
-        import matplotlib.pyplot as plt
         
         plt.figure(figsize=(12, 6))
         for agent, stats in self.reward_stats.items():
@@ -559,24 +571,37 @@ class MADDQN:
         """
         繪製每個episode的回報率趨勢圖
         """
-        
-        
         episodes = list(range(1, self.configs['training']['episodes'] + 1))
-        risk_returns = [np.mean(self.reward_stats['risk_agent']['rewards'][i::self.configs['training']['episodes']]) for i in range(self.configs['training']['episodes'])]
-        return_returns = [np.mean(self.reward_stats['return_agent']['rewards'][i::self.configs['training']['episodes']]) for i in range(self.configs['training']['episodes'])]
-        final_returns = [np.mean(self.reward_stats['final_agent']['rewards'][i::self.configs['training']['episodes']]) for i in range(self.configs['training']['episodes'])]
+        risk_returns = self.episode_returns['risk_agent']
+        return_returns = self.episode_returns['return_agent'] 
+        final_returns = self.episode_returns['final_agent']
+        
+        # 如果episode數量不匹配，進行調整
+        expected_episodes = self.configs['training']['episodes']
+        if len(risk_returns) < expected_episodes:
+            # 如果數據不足，用0填充
+            risk_returns.extend([0] * (expected_episodes - len(risk_returns)))
+            return_returns.extend([0] * (expected_episodes - len(return_returns)))
+            final_returns.extend([0] * (expected_episodes - len(final_returns)))
+        elif len(risk_returns) > expected_episodes:
+            # 如果數據過多，截取
+            risk_returns = risk_returns[:expected_episodes]
+            return_returns = return_returns[:expected_episodes]
+            final_returns = final_returns[:expected_episodes]
 
         plt.figure(figsize=(12, 6))
-        plt.plot(episodes, risk_returns, label='Risk Agent Returns', marker='o')
-        plt.plot(episodes, return_returns, label='Return Agent Returns', marker='o')
-        plt.plot(episodes, final_returns, label='Final Agent Returns', marker='o')
+        plt.plot(episodes, risk_returns, label='Risk Agent Returns', marker='o', alpha=0.7)
+        plt.plot(episodes, return_returns, label='Return Agent Returns', marker='o', alpha=0.7)
+        plt.plot(episodes, final_returns, label='Final Agent Returns', marker='o', alpha=0.7)
         
         plt.title("Episode Returns of Agents")
         plt.xlabel("Episode")
-        plt.ylabel("Average Return")
+        plt.ylabel("Cumulative Return per Episode")
         plt.legend()
-        plt.grid()
-        plt.savefig("episode_returns.png")
+        plt.grid(True, alpha=0.3)
+        plt.savefig("episode_returns.png", dpi=300, bbox_inches='tight')
+        plt.show()
+        print("📊 Episode回報趨勢圖已保存為 'episode_returns.png'")
     
     def plot_loss_trends(self):
         """
@@ -604,7 +629,6 @@ class MADDQN:
         """
         繪製股票歷史價格圖
         """
-        import matplotlib.pyplot as plt
         
         try:
             # 檢查數據結構並正確獲取日期和價格
@@ -764,8 +788,10 @@ class MADDQN:
             
             # 獲取當前數據
             current_sequence = self.test_data[timestep]
-            test_start_idx = len(self.train_data)
-            current_data_index = test_start_idx + timestep
+            # test_start_idx = len(self.train_data)
+            # current_data_index = test_start_idx + timestep
+            actual_test_start_idx = self.configs['env']['window_size'] - 1 + len(self.train_data)
+            current_data_index = actual_test_start_idx + timestep
             
             if current_data_index >= len(self.unprocessed_data):
                 current_data_index = len(self.unprocessed_data) - 1
