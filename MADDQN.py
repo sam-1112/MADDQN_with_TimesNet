@@ -1,6 +1,6 @@
 import os
 import numpy as np
-import pandas as pd
+import glob
 import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -96,6 +96,7 @@ class MADDQN:
         self.subEnvList = []
         for agentType in ['risk', 'return']:
             subEnv = MADDQNENV(
+                configs=self.configs,
                 tradeData=self.unprocessed_data,  # 移除 configs 參數
                 window_size=self.configs['env']['window_size'],
                 n_agents=self.configs['env'][f'{agentType}_agent']
@@ -104,6 +105,7 @@ class MADDQN:
 
         # Initialize the main environment - 修正參數
         self.env = MADDQNENV(
+            configs=self.configs,
             tradeData=self.unprocessed_data,  # 移除 configs 參數
             window_size=self.configs['env']['window_size'],
             n_agents=self.configs['env']['risk_agent'] + self.configs['env']['return_agent']
@@ -293,8 +295,10 @@ class MADDQN:
                 self._print_training_progress(episode)
                 # 分析獎勵分佈
                 self.analyze_reward_distribution()
-                
-        
+            
+            # save models for all agents
+            self.save_models(episode)
+
         # 訓練完成
         print("\nMADDQN 訓練過程完成！")
         
@@ -718,22 +722,30 @@ class MADDQN:
         """
         print("開始 MADDQN 測試過程...")
         
-        # 獲取測試數據總長度
-        total_sequences = len(self.test_data)
-        print(f"Total testing sequences: {total_sequences}")
+        
         
         # 重置環境
         self.initialize()
         self.env.reset()
         for subEnv in self.subEnvList:
             subEnv.reset()
-        
+        # 獲取測試數據總長度
+        total_sequences = len(self.test_data)
+        print(f"Total testing sequences: {total_sequences}")
+
+        # choose the most recently model all agents
+        model_paths_pattern = glob.glob(os.path.join(self.configs['training']['model_save_dir'], "*agent_*.pth"))
+        risk_agent_model_path =  [path for path in model_paths_pattern if path.startswith("./checkpoints/risk_agent")]
+        return_agent_model_path = [path for path in model_paths_pattern if path.startswith("./checkpoints/return_agent")]
+        final_agent_model_path = [path for path in model_paths_pattern if path.startswith("./checkpoints/final_agent")]
+        sorted(risk_agent_model_path, key=os.path.getmtime)
+        sorted(return_agent_model_path, key=os.path.getmtime)
+        sorted(final_agent_model_path, key=os.path.getmtime)
         model_path = [
-            self.configs['training']['risk_agent_model_path'],
-            self.configs['training']['return_agent_model_path'],
-            self.configs['training']['final_agent_model_path']
+            risk_agent_model_path[0] if risk_agent_model_path else None,
+            return_agent_model_path[0] if return_agent_model_path else None,
+            final_agent_model_path[0] if final_agent_model_path else None
         ]
-        
         try:
             self.load_models(model_paths=model_path)
             print("模型加載成功，開始測試過程...")
@@ -1167,7 +1179,7 @@ class MADDQN:
             
             # 載入 Risk Agent 模型
             if risk_agent_path and os.path.exists(risk_agent_path):
-                risk_state_dict = torch.load(risk_agent_path, map_location=self.device)
+                risk_state_dict = torch.load(risk_agent_path, map_location=self.device, weights_only=True)
                 self.riskAgentModel.policy_network.load_state_dict(risk_state_dict)
                 self.riskAgentModel.target_network.load_state_dict(risk_state_dict)
                 print(f"✅ Risk Agent 模型已載入: {risk_agent_path}")
@@ -1176,7 +1188,7 @@ class MADDQN:
                 
             # 載入 Return Agent 模型
             if return_agent_path and os.path.exists(return_agent_path):
-                return_state_dict = torch.load(return_agent_path, map_location=self.device)
+                return_state_dict = torch.load(return_agent_path, map_location=self.device, weights_only=True)
                 self.returnAgentModel.policy_network.load_state_dict(return_state_dict)
                 self.returnAgentModel.target_network.load_state_dict(return_state_dict)
                 print(f"✅ Return Agent 模型已載入: {return_agent_path}")
@@ -1185,7 +1197,7 @@ class MADDQN:
                 
             # 載入 Final Agent 模型
             if final_agent_path and os.path.exists(final_agent_path):
-                final_state_dict = torch.load(final_agent_path, map_location=self.device)
+                final_state_dict = torch.load(final_agent_path, map_location=self.device, weights_only=True)
                 self.finalAgentModel.policy_network.load_state_dict(final_state_dict)
                 self.finalAgentModel.target_network.load_state_dict(final_state_dict)
                 print(f"✅ Final Agent 模型已載入: {final_agent_path}")
@@ -1214,11 +1226,9 @@ class MADDQN:
             episode: 當前episode數 (可選，用於檔名)
         """
         try:
-            import os
             
             # 創建模型保存目錄
-            save_dir = self.configs.get('training', {}).get('model_save_dir', './saved_models')
-            os.makedirs(save_dir, exist_ok=True)
+            save_dir = self.configs['training']['model_save_dir']
             
             # 生成檔名
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -1239,10 +1249,6 @@ class MADDQN:
             torch.save(self.finalAgentModel.policy_network.state_dict(), final_path)
             print(f"✅ Final Agent 模型已保存: {final_path}")
             
-            # 更新配置中的模型路徑
-            self.configs['training']['risk_agent_model_path'] = risk_path
-            self.configs['training']['return_agent_model_path'] = return_path
-            self.configs['training']['final_agent_model_path'] = final_path
             
             return {
                 'risk_agent_path': risk_path,

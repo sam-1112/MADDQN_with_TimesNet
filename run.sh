@@ -1,3 +1,3 @@
-export PYTHONPATH=/home/bcs113110/BCS113110/DDQN_PSO/TimesNet/
+export PYTHONPATH=$HOME/MADDQN_with_TimesNet/
 
 python main.py

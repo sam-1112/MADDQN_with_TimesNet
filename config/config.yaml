@@ -30,9 +30,7 @@ training:
   optimizer: "adam"
   target_update_frequency: 10
   discount_factor: 0.9
-  risk_agent_model_path: "./checkpoints/risk_agent.pth"
-  return_agent_model_path: "./checkpoints/return_agent.pth"
-  final_agent_model_path: "./checkpoints/final_agent.pth"
+  model_save_dir: "./checkpoints"
   attention: False
   multi_stocks: False
   

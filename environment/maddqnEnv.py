@@ -13,7 +13,8 @@ class Observation:
 
 
 class MADDQNENV:
-    def __init__(self, tradeData, window_size=10, n_agents=3):
+    def __init__(self,configs, tradeData, window_size=10, n_agents=3):
+        self.configs = configs
         self.tradeData = tradeData
         self.window_size = window_size
         self.n_agents = n_agents

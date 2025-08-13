@@ -19,7 +19,7 @@ class FetchData:
         Returns:
             data: DataFrame containing stock data with date as index
         """
-        data = yfinance.download(self.ticker, start=self.start_date, end=self.end_date)
+        data = yfinance.download(self.ticker, start=self.start_date, end=self.end_date, auto_adjust=True)
         if data.empty:
             raise ValueError(f"No data found for ticker {self.ticker} between {self.start_date} and {self.end_date}.")
         
