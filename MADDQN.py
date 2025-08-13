@@ -13,8 +13,9 @@ import json
 from datetime import datetime
 
 class MADDQN:
-    def __init__(self, configs):
+    def __init__(self, configs, args):
         self.configs = configs
+        self.args = args
         # 正確設定設備
         self.device = torch.device("cuda" if torch.cuda.is_available() and configs['gpu']['use_gpu'] else "cpu")
         print(f"Using device: {self.device}")
@@ -49,8 +50,6 @@ class MADDQN:
             'train_prices': [],
             'test_prices': []
         }
-
-
 
 
     def initialize(self):
