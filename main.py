@@ -9,11 +9,11 @@ def parse_arguement():
     Parse command line arguments.
     """
     parser = argparse.ArgumentParser(description="MADDQN Training and Testing")
-    
-    parser.add_argument('--mode', type=str, default='single', choices=['single', 'multi'], help="Mode of operation: single or multi tickers")
-    parser.add_argument('--attention', type=bool, default=False, help="Use attention mechanism in the final agent")
-    parser.add_argument('--reward_shaping', type=bool, default=False, help="Use reward shaping in each agent")
-    
+
+    parser.add_argument('--mode', type=str, default='single', choices=['single', 'multi'], dest='mode', help="Mode of operation: single or multi tickers")
+    parser.add_argument('--attention', type=bool, default=False, dest='attention', help="Use attention mechanism in the final agent")
+    parser.add_argument('--reward_shaping', type=bool, default=False, dest='reward_shaping', help="Use reward shaping in each agent")
+
     return parser.parse_args()
 
 if __name__ == "__main__":

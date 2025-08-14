@@ -145,6 +145,6 @@ class subAgent(BaseAgent):
         根據 epsilon_decay 參數，衰減 epsilon 的值，並確保其不低於 epsilon_min。
         """
         # 指數衰減公式
-        self.epsilon = self.epsilon_min + (self.epsilon_max - self.epsilon_min) * math.exp(-self.epsilon_decay * episode)
+        # self.epsilon = self.epsilon_min + (self.epsilon_max - self.epsilon_min) * math.exp(-self.epsilon_decay * episode)
         # 線性衰減公式
-        # self.epsilon = max(self.epsilon_min, self.epsilon_max - (self.epsilon_max - self.epsilon_min) * (episode / self.configs['training']['episodes']))
+        self.epsilon = max(self.epsilon_min, self.epsilon_max - (self.epsilon_max - self.epsilon_min) * (episode / self.episodes))

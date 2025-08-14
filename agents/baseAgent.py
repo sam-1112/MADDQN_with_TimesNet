@@ -20,6 +20,7 @@ class BaseAgent:
         self.device = configs['gpu']['use_gpu'] and torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.replay_buffer = replayBuffer(max_size=configs['training']['replay_memory_size'])
         self.done = done
+        self.episodes = configs['training']['episodes']
 
     def act(self, state):
         pass
